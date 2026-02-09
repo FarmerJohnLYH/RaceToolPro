@@ -2,12 +2,9 @@ import cv2
 import numpy as np
 import easyocr
 import os
-import re
-import time
-import datetime
 import pandas as pd
+from tqdm import tqdm
 from PIL import Image
-
 reader = easyocr.Reader(['en'])
 dict = {
         "刹车力度": [[np.int32(85), np.int32(799)], [np.int32(151), np.int32(799)], [np.int32(151), np.int32(843)], [np.int32(85), np.int32(843)]],
@@ -15,25 +12,7 @@ dict = {
         "LapTime": [[np.int32(788), np.int32(810)], [np.int32(1134), np.int32(810)], [np.int32(1134), np.int32(882)], [np.int32(788), np.int32(882)]],
         "电机功率": [[np.int32(1012), np.int32(980)], [np.int32(1096), np.int32(980)], [np.int32(1096), np.int32(1028)], [np.int32(1012), np.int32(1028)]],
         "时速": [[np.int32(492), np.int32(888)], [np.int32(576), np.int32(888)], [np.int32(576), np.int32(936)], [np.int32(492), np.int32(936)]],
-    }
-def extract_text_with_easyocr(image, output_dir, file_prefix):
-    """
-    使用EasyOCR提取图像中的文字
-    """
-    print("正在使用EasyOCR识别文字...")
-    # 方案 1 全图识别
-    results = reader.readtext(image,
-                            allowlist='0123456789.:')
-    annotated_img = image.copy()
-    for (bbox, text, prob) in results:
-        pts = np.array(bbox, np.int32).reshape((-1, 1, 2))
-        cv2.polylines(annotated_img, [pts], True, (0, 255, 0), 2)
-        cv2.putText(annotated_img, text, (int(bbox[0][0]), int(bbox[0][1]) - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-    annotated_path = os.path.join(output_dir, f"{file_prefix}_annotated.jpg")
-    cv2.imwrite(annotated_path, annotated_img)
-    print(f"标注后的图像已保存至: {annotated_path}")
-    return results, annotated_img
+}
 def crop(image, area):
     var = [10, 10]
     x1 = max(0, min(area[0][0], area[1][0], area[2][0], area[3][0]) - var[0])
@@ -83,16 +62,6 @@ def process_one_frame(image_path, index=0):
     if image is None:
         print("错误：无法读取图像")
         return None
-    input_filename = os.path.splitext(os.path.basename(image_path))[0]
-    output_dir = os.path.join(os.path.dirname(image_path), "ocr_results")
-    os.makedirs(output_dir, exist_ok=True)
-    # 按照格式重命名结果图像：序号_输入文件名
-    file_prefix = f"{index}_{input_filename}_"
-    # text_results, annotated_img = extract_text_with_easyocr(image, output_dir, file_prefix)
-        # text_results_path = os.path.join(output_dir, f"{file_prefix}_text_results.csv")
-        # df_text_results = pd.DataFrame(text_results, columns=["bbox", "text", "probability"])
-        # df_text_results.to_csv(text_results_path, index=False, encoding='utf-8-sig')
-        # print(f"OCR识别结果已保存至: {text_results_path}")
     # 方案 2 针对 1920*1080 的特定区域进行裁剪识别
     infos = extract_infos(image) 
     return infos
@@ -118,8 +87,7 @@ def main():
         return
     print(f"找到 {len(image_files)} 个图片文件，开始处理...")
     results_data = []
-    for i, image_path in enumerate(image_files):
-        print(f"\n[{i+1}/{len(image_files)}] 处理图片: {os.path.basename(image_path)}")
+    for i, image_path in enumerate(tqdm(image_files)):
         result = process_one_frame(image_path, i+1)
         if not result:
             print(f"处理失败: {image_path}")
