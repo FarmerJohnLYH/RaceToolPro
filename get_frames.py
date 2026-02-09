@@ -30,6 +30,10 @@ def extract_frames_from_video(video_path, output_dir="output_frames", frame_pref
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))  # 总帧数
     fps = cap.get(cv2.CAP_PROP_FPS)  # 帧率（可选，用于参考）
     print(f"开始提取帧：\n- 视频路径：{video_path}\n- 总帧数：{total_frames}\n- 帧率：{fps:.2f} FPS")
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    print(f"视频分辨率：{width}x{height}")
+    # 帧率：29.90 FPS 视频分辨率：1920x1080
     
     # 6. 逐帧读取并保存
     frame_count = 0
