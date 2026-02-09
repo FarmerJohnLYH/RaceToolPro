@@ -67,7 +67,8 @@ def process_one_frame(image_path, index=0):
     return infos
 
 def main():
-    input_dir = "./input"
+    input_dir = "./video_frames"
+    # input_dir = "./input"
     if not os.path.exists(input_dir):
         print(f"错误：输入目录 {input_dir} 不存在")
         os.makedirs(input_dir, exist_ok=True)
@@ -87,19 +88,29 @@ def main():
         return
     print(f"找到 {len(image_files)} 个图片文件，开始处理...")
     results_data = []
-    for i, image_path in enumerate(tqdm(image_files)):
+    csv_path = os.path.join(input_dir, "recognition_results.csv")
+    if os.path.exists(csv_path):
+        # delete existing csv file to avoid confusion
+        os.remove(csv_path)
+        print(f"警告：输出文件 {csv_path} 已存在，已删除")
+    # 排序 image_files 
+    image_files.sort()
+    skipped_frame = 30  # 每 30 帧跑一次. 最后改成 1
+    for i, image_path in enumerate(tqdm(image_files)): 
+        if(i%skipped_frame != 0):
+            continue
         result = process_one_frame(image_path, i+1)
         if not result:
             print(f"处理失败: {image_path}")
             continue
         result["image_name"] = os.path.basename(image_path)
         results_data.append(result)
-    # 将结果保存为CSV表格
-    if results_data:
-        df = pd.DataFrame(results_data)
-        csv_path = os.path.join(input_dir, "ocr_results", "recognition_results.csv")
-        df.to_csv(csv_path, index=False, encoding='utf-8-sig')
-        print(f"\n识别结果已保存到表格: {csv_path}")
+        # 实时保存到 csv 表格 
+        df = pd.DataFrame([result])
+        if not os.path.exists(csv_path):
+            df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+        else:
+            df.to_csv(csv_path, mode='a', header=False, index=False, encoding='utf-8-sig')
 
 if __name__ == "__main__":
     main()
