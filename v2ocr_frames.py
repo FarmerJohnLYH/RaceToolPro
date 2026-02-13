@@ -3,6 +3,8 @@ import numpy as np
 import easyocr
 import os
 import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.signal import find_peaks
 from tqdm import tqdm
 from PIL import Image
 reader = easyocr.Reader(['en'])
@@ -66,6 +68,35 @@ def process_one_frame(image_path, index=0):
     infos = extract_infos(image) 
     return infos
 
+import re
+
+def laptime_to_seconds(laptime_str):
+    if pd.isna(laptime_str) or laptime_str is None:
+        return 0.0
+    # 匹配 分:秒.毫秒 ,  分.秒.毫秒, 秒.毫秒 格式
+    match = re.match(r'(\d+):(\d+\.\d+)', str(laptime_str))
+    if match:
+        return int(match.group(1))*60 + float(match.group(2))
+    
+    match = re.match(r'(\d+)\.(\d+\.\d+)', str(laptime_str))
+    if match:
+        return int(match.group(1))*60 + float(match.group(2))
+    match2 = re.match(r'(\d+\.\d+)', str(laptime_str))
+    if match2:
+        return float(match2.group(1))
+    return 0.0
+
+def clean_speed_value(val):
+    if pd.isna(val) or val is None:
+        return 0.0
+        # 提取数字和小数点，过滤其他字符
+    num_str = re.findall(r'[\d\.]+', str(val))
+    if num_str:
+        try:
+            return float(''.join(num_str))
+        except:
+            return 0.0
+    return 0.0
 def main():
     input_dir = "./video_frames"
     # input_dir = "./input"
@@ -87,6 +118,7 @@ def main():
         print(f"错误：在 {input_dir} 目录中未找到图片文件")
         return
     print(f"找到 {len(image_files)} 个图片文件，开始处理...")
+
     results_data = []
     csv_path = os.path.join(input_dir, "recognition_results.csv")
     if os.path.exists(csv_path):
@@ -97,20 +129,63 @@ def main():
     image_files.sort()
     skipped_frame = 10  # 每 30 帧跑一次. 最后改成 1
     for i, image_path in enumerate(tqdm(image_files)): 
+        if(i < 4841 or i > 8350): # 仅针对 2026-01-31_15-47-51_Front
+            continue 
         if(i%skipped_frame != 0):
             continue
         result = process_one_frame(image_path, i+1)
-        if not result:
+        if (not result) or (result["LapTime"] is None):
             print(f"处理失败: {image_path}")
             continue
         result["image_name"] = os.path.basename(image_path)
         results_data.append(result)
-        # 实时保存到 csv 表格 
-        df = pd.DataFrame([result])
-        if not os.path.exists(csv_path):
-            df.to_csv(csv_path, index=False, encoding='utf-8-sig')
-        else:
-            df.to_csv(csv_path, mode='a', header=False, index=False, encoding='utf-8-sig')
+       
+        stream_save = False # 实时保存到 csv 表格 
+        if (stream_save): 
+            df = pd.DataFrame([result])
+            if not os.path.exists(csv_path):
+                df.to_csv(csv_path, index=False, encoding='utf-8-sig')
+            else:
+                df.to_csv(csv_path, mode='a', header=False, index=False, encoding='utf-8-sig')
+
+    df_result = pd.DataFrame(results_data)
+    df_result.to_csv(csv_path[:-4] + "_final.csv", index=False, encoding='utf-8-sig') # 保存最终结果到 csv 文件
+    # 计算时速的极值点，并绘图 
+
+    se = df_result.copy().reset_index(drop=True)  # 重置索引为连续有序的0,1,2...
+    se['Speed_value'] = se['时速'].apply(clean_speed_value)
+    se['LapTime_sec'] = se['LapTime'].apply(laptime_to_seconds)
+
+
+    peak_indices, _ = find_peaks(se['Speed_value'], height=0, distance=5)  # distance避免相邻帧重复极值
+    valley_indices, _ = find_peaks(-se['Speed_value'], distance=5)
+    peak_indices = np.concatenate([peak_indices, valley_indices])
+
+
+    plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']  # 解决中文显示
+    plt.rcParams['axes.unicode_minus'] = False
+
+    fig, ax = plt.subplots(figsize=(15, 8))
+    ax.plot(se['LapTime_sec'], se['Speed_value'], 
+            color='blue', linewidth=3, label='时速曲线')
+    ax.scatter(se['LapTime_sec'].iloc[peak_indices], se['Speed_value'].iloc[peak_indices],
+               color='red', s=50, zorder=5)
+
+    for idx in peak_indices:
+        x = se['LapTime_sec'].iloc[idx]
+        y = se['Speed_value'].iloc[idx]
+        ax.text(x + 0.5, y + 1,
+                f'({x:.1f}s, {y:.0f}km/h)',
+                fontsize=8, color='red', ha='left', va='bottom')
+
+    xticks = np.arange(0, np.ceil(se['LapTime_sec'].max() / 10) * 10 + 10, 10)             # 生成10秒间隔的刻度（如0,10,20...）
+    ax.set_xticks(xticks)
+    yticks = np.arange(0, np.ceil(se['Speed_value'].max() / 25) * 25+25, 25)             # 生成25km/h间隔的刻度（如0,25,50...）
+    ax.set_yticks(yticks)
+    plt.grid(True, linestyle='--', alpha=0.7, color='gray', linewidth=0.8)
+    plt.tight_layout()
+    plot_save_path = os.path.join(input_dir, "speed_extremes_plot.png")
+    plt.savefig(plot_save_path, dpi=300, bbox_inches='tight')
 
 if __name__ == "__main__":
     main()
