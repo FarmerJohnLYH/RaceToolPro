@@ -39,7 +39,7 @@ def main():
     if not os.path.exists(input_dir):
         os.makedirs(input_dir, exist_ok=True)
         print(f"已创建输入目录: {input_dir}")
-    csv_path = "recognition_results_final.csv"
+    csv_path = "w=3recognition_results_final.csv"
     df_result = pd.read_csv(csv_path)
     se = df_result.copy().reset_index(drop=True)
 
@@ -106,7 +106,7 @@ def main():
 
     plt.tight_layout()
 
-    plot_save_path = os.path.join(input_dir, "speed_extremes_plot.png")
+    plot_save_path = os.path.join(input_dir, "赛道时速与操作力度趋势图.png")
     plt.savefig(plot_save_path, dpi=600, bbox_inches='tight')
     print(f"图表已保存至: {plot_save_path}")
 

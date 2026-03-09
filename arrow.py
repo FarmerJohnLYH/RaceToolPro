@@ -8,7 +8,7 @@ import shutil
 
 input_dir = "input/"
 output_dir = "output/"
-base_img = cv2.imread("base_track.png")
+base_img = cv2.imread("base_track.png") # 依赖 clip.py 生成的赛道图
 
 def detect_arrow_and_orientation(image_name):
     global base_img
@@ -29,16 +29,17 @@ def detect_arrow_and_orientation(image_name):
     center = (round(center[1]), round(center[0]))
 
     # 绘制质心 绘制叠加
+    #TODO 根据当前帧的速度，选择该点的颜色
+    #TODO 整合代码，制作目前进度的端到端
     mask = np.zeros_like(base_img)
     cv2.circle(mask, center, 3, (255 - 0, 255 - 255, 255 - 0), -1)
-    cv2.imwrite(output_dir + image_name[:-9]+'mask.png', mask)
+    cv2.imwrite(output_dir + image_name[:-9]+'_mask.png', mask)
 
     base_img = cv2.bitwise_not(base_img)
     base_img = cv2.add(base_img, mask)
-
     cv2.imwrite(output_dir + image_name[:-9]+'_white.png', base_img)
-    base_img = cv2.bitwise_not(base_img)
-    cv2.imwrite(output_dir + image_name[:-9]+'_dark.png', base_img) # 原版
+    
+
 def clip_track(image_name):
     image_path = os.path.join(input_dir, image_name)
     img = Image.open(image_path)
@@ -53,7 +54,8 @@ if os.path.exists(output_dir):
 os.mkdir(output_dir)
 
 for root, dirs, files in os.walk(input_dir):
-    for name in files:
-        if name.endswith((".png", ".jpg")):
+    for name in sorted(files):
+        file_path = os.path.join(input_dir, name)
+        if os.path.isfile(file_path) and name.endswith((".png", ".jpg")):
             crop_name = clip_track(name)
             detect_arrow_and_orientation(crop_name)

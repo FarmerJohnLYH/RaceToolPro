@@ -1,7 +1,7 @@
 from PIL import Image
 
 # 加载图像
-input_file = "input/2026-01-31_15-47-51_Front_frame_004912.jpg"
+input_file = "v1video_frames/2026-01-31_15-47-51_Front_frame_004912.jpg"
 img = Image.open(input_file)
 width, height = img.size
 print("Original image size:", width, height)
