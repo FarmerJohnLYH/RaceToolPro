@@ -1,4 +1,7 @@
 # 隐私文件 
+*.jpg
+*.png
+*.csv
 input
 video_frames
 .DS_Store

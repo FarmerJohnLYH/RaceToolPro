@@ -98,7 +98,7 @@ def clean_speed_value(val):
             return 0.0
     return 0.0
 def main():
-    input_dir = "./v1video_frames"
+    input_dir = "./video_frames"
     # input_dir = "./input"
     if not os.path.exists(input_dir):
         print(f"错误：输入目录 {input_dir} 不存在")
@@ -120,14 +120,14 @@ def main():
     print(f"找到 {len(image_files)} 个图片文件，开始处理...")
 
     results_data = []
-    csv_path = "recognition_results.csv"
+    csv_path = os.path.join(input_dir, "recognition_results.csv")
     if os.path.exists(csv_path):
         # delete existing csv file to avoid confusion
         os.remove(csv_path)
         print(f"警告：输出文件 {csv_path} 已存在，已删除")
     # 排序 image_files 
     image_files.sort()
-    skipped_frame = 3  # 每 30 帧跑一次. 最后改成 1. 1 的锯齿很严重，更新不同步
+    skipped_frame = 10  # 每 30 帧跑一次. 最后改成 1
     for i, image_path in enumerate(tqdm(image_files)): 
         if(i < 4841 or i > 8350): # 仅针对 2026-01-31_15-47-51_Front
             continue 
@@ -159,32 +159,26 @@ def main():
 
     peak_indices, _ = find_peaks(se['Speed_value'], height=0, distance=5)  # distance避免相邻帧重复极值
     valley_indices, _ = find_peaks(-se['Speed_value'], distance=5)
-    peak_indices = np.concatenate([peak_indices, valley_indices])
-
 
     plt.rcParams['font.sans-serif'] = ['Arial Unicode MS', 'SimHei']  # 解决中文显示
     plt.rcParams['axes.unicode_minus'] = False
 
     fig, ax = plt.subplots(figsize=(15, 8))
     ax.plot(se['LapTime_sec'], se['Speed_value'], 
-            color='blue', linewidth=3, label='时速曲线')
-    ax.scatter(se['LapTime_sec'].iloc[peak_indices], se['Speed_value'].iloc[peak_indices],
-               color='red', s=50, zorder=5)
-
-    for idx in peak_indices:
-        x = se['LapTime_sec'].iloc[idx]
-        y = se['Speed_value'].iloc[idx]
-        ax.text(x + 0.5, y + 1,
-                f'({x:.1f}s, {y:.0f}km/h)',
-                fontsize=8, color='red', ha='left', va='bottom')
+            color='blue', linewidth=1.5, label='时速曲线')
+    ax.scatter(peak_indices, se['Speed_value'].iloc[peak_indices],
+               color='orange', s=50, zorder=5, label='局部最高时速点')
+    ax.scatter(valley_indices, se['Speed_value'].iloc[valley_indices], 
+               color='darkorange', s=50, zorder=5, label='局部最低时速点')
 
     xticks = np.arange(0, np.ceil(se['LapTime_sec'].max() / 10) * 10 + 10, 10)             # 生成10秒间隔的刻度（如0,10,20...）
     ax.set_xticks(xticks)
     yticks = np.arange(0, np.ceil(se['Speed_value'].max() / 25) * 25+25, 25)             # 生成25km/h间隔的刻度（如0,25,50...）
     ax.set_yticks(yticks)
-    plt.grid(True, linestyle='--', alpha=0.7, color='gray', linewidth=0.8)
-    plt.tight_layout()
+    
+
     plot_save_path = os.path.join(input_dir, "speed_extremes_plot.png")
+    plt.tight_layout()
     plt.savefig(plot_save_path, dpi=300, bbox_inches='tight')
 
 if __name__ == "__main__":
